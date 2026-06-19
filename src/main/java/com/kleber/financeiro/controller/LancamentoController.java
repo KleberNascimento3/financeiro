@@ -162,11 +162,27 @@ public class LancamentoController {
                 && lancamento.getTotalParcelas() != null
                 && lancamento.getTotalParcelas() > 1) {
 
+            if (lancamento.getEvento() == null
+                    || lancamento.getEvento().getIndice() == null) {
+
+                result.rejectValue(
+                        "evento",
+                        "evento.obrigatorio",
+                        "Selecione um evento para lançar as parcelas");
+
+                carregarCombos(model);
+                return "lancamento-form";
+            }
+
             BigDecimal valorParcela =
                     lancamento.getValor().divide(
                             BigDecimal.valueOf(lancamento.getTotalParcelas()),
                             2,
                             java.math.RoundingMode.HALF_UP);
+
+            List<EventoFinanceiro> eventosParcelas =
+                    eventoRepository.findByIndiceGreaterThanEqualOrderByIndiceAsc(
+                            lancamento.getEvento().getIndice());
 
             for (int i = 1; i <= lancamento.getTotalParcelas(); i++) {
 
@@ -178,7 +194,6 @@ public class LancamentoController {
                                 + lancamento.getTotalParcelas());
 
                 parcela.setCategoria(lancamento.getCategoria());
-                parcela.setEvento(lancamento.getEvento());
                 parcela.setCartao(lancamento.getCartao());
                 parcela.setCompromisso(lancamento.getCompromisso());
 
@@ -187,33 +202,44 @@ public class LancamentoController {
                 parcela.setValor(valorParcela);
 
                 parcela.setParcelado(true);
-                parcela.setRecorrente(lancamento.getRecorrente());
+                parcela.setRecorrente(false);
                 parcela.setNumeroParcela(i);
                 parcela.setTotalParcelas(lancamento.getTotalParcelas());
+                parcela.setDiaRecorrencia(lancamento.getDiaRecorrencia());
 
-                parcela.setDataVencimento(
-                        lancamento.getDataVencimento().plusMonths(i - 1));
+                EventoFinanceiro eventoParcela = null;
+
+                int indiceDesejado =
+                        lancamento.getEvento().getIndice()
+                                + ((i - 1) * 2);
+
+                for (EventoFinanceiro e : eventosParcelas) {
+                    if (e.getIndice() != null
+                            && e.getIndice().equals(indiceDesejado)) {
+                        eventoParcela = e;
+                        break;
+                    }
+                }
+
+                parcela.setEvento(eventoParcela);
+
+                if (eventoParcela != null
+                        && eventoParcela.getDataEvento() != null) {
+
+                    parcela.setDataVencimento(
+                            eventoParcela.getDataEvento());
+
+                } else {
+
+                    parcela.setDataVencimento(
+                            lancamento.getDataVencimento()
+                                    .plusMonths(i - 1));
+                }
 
                 repository.save(parcela);
             }
 
         } else {
-        	
-        	System.out.println("===============");
-        	System.out.println("CATEGORIA = " + lancamento.getCategoria());
-
-        	if (lancamento.getCategoria() != null) {
-        	    System.out.println("ID CATEGORIA = "
-        	            + lancamento.getCategoria().getId());
-        	}
-
-        	System.out.println("EVENTO = "
-        	        + lancamento.getEvento());
-
-        	System.out.println("CARTAO = "
-        	        + lancamento.getCartao());
-
-        	System.out.println("===============");
             repository.save(lancamento);
         }
 

@@ -33,8 +33,7 @@ public class EventoFinanceiroController {
     @GetMapping("/eventos")
     public String listar(Model model) {
 
-        model.addAttribute("lista",
-                repository.findAll());
+        model.addAttribute("lista", repository.findAll());
 
         return "eventos";
     }
@@ -42,21 +41,17 @@ public class EventoFinanceiroController {
     @GetMapping("/eventos/novo")
     public String novo(Model model) {
 
-        model.addAttribute("evento",
-                new EventoFinanceiro());
+        model.addAttribute("evento", new EventoFinanceiro());
 
         return "evento-form";
     }
 
     @PostMapping("/eventos/salvar")
-    public String salvar(
-            @ModelAttribute EventoFinanceiro evento) {
+    public String salvar(@ModelAttribute EventoFinanceiro evento) {
 
-        boolean novoEvento =
-                evento.getId() == null;
+        boolean novoEvento = evento.getId() == null;
 
-        EventoFinanceiro eventoSalvo =
-                repository.save(evento);
+        EventoFinanceiro eventoSalvo = repository.save(evento);
 
         if (novoEvento) {
             gerarLancamentosRecorrentes(eventoSalvo);
@@ -65,68 +60,16 @@ public class EventoFinanceiroController {
         return "redirect:/eventos";
     }
 
-    private void gerarLancamentosRecorrentes(
-            EventoFinanceiro evento) {
+    @GetMapping("/eventos/gerar-recorrentes/{id}")
+    public String gerarRecorrentesEventoExistente(
+            @PathVariable Long id) {
 
-        Integer diaRecorrencia =
-                definirDiaRecorrencia(evento);
+        EventoFinanceiro evento =
+                repository.findById(id).orElseThrow();
 
-        if (diaRecorrencia == null) {
-            return;
-        }
+        gerarLancamentosRecorrentes(evento);
 
-        List<Lancamento> recorrentes =
-                lancamentoRepository
-                .findByRecorrenteTrueAndDiaRecorrencia(
-                        diaRecorrencia);
-
-        for (Lancamento r : recorrentes) {
-
-            Lancamento novo = new Lancamento();
-
-            novo.setDescricao(r.getDescricao());
-            novo.setValor(r.getValor());
-            novo.setTipo(r.getTipo());
-            novo.setStatus(r.getStatus());
-
-            novo.setCategoria(r.getCategoria());
-            novo.setCartao(r.getCartao());
-            novo.setCompromisso(r.getCompromisso());
-
-            novo.setEvento(evento);
-
-            if (evento.getDataEvento() != null) {
-                novo.setDataVencimento(
-                        evento.getDataEvento());
-            } else {
-                novo.setDataVencimento(
-                        r.getDataVencimento());
-            }
-
-            novo.setRecorrente(false);
-            novo.setDiaRecorrencia(
-                    r.getDiaRecorrencia());
-
-            novo.setParcelado(false);
-            novo.setTotalParcelas(null);
-            novo.setNumeroParcela(null);
-
-            lancamentoRepository.save(novo);
-        }
-    }
-
-    private Integer definirDiaRecorrencia(
-            EventoFinanceiro evento) {
-
-        if (evento.getIndice() == null) {
-            return null;
-        }
-
-        if (evento.getIndice() % 2 == 0) {
-            return 30;
-        }
-
-        return 15;
+        return "redirect:/eventos/" + id;
     }
 
     @GetMapping("/eventos/editar/{id}")
@@ -135,8 +78,7 @@ public class EventoFinanceiroController {
             Model model) {
 
         EventoFinanceiro evento =
-                repository.findById(id)
-                .orElseThrow();
+                repository.findById(id).orElseThrow();
 
         model.addAttribute("evento", evento);
 
@@ -144,12 +86,10 @@ public class EventoFinanceiroController {
     }
 
     @GetMapping("/eventos/encerrar/{id}")
-    public String encerrar(
-            @PathVariable Long id) {
+    public String encerrar(@PathVariable Long id) {
 
         EventoFinanceiro evento =
-                repository.findById(id)
-                .orElseThrow();
+                repository.findById(id).orElseThrow();
 
         evento.setEncerrado(true);
 
@@ -164,8 +104,7 @@ public class EventoFinanceiroController {
             Model model) {
 
         EventoFinanceiro evento =
-                repository.findById(id)
-                .orElseThrow();
+                repository.findById(id).orElseThrow();
 
         List<Lancamento> lancamentos =
                 lancamentoRepository.findByEventoId(id);
@@ -186,8 +125,7 @@ public class EventoFinanceiroController {
             }
         }
 
-        BigDecimal saldo =
-                receitas.subtract(despesas);
+        BigDecimal saldo = receitas.subtract(despesas);
 
         model.addAttribute("evento", evento);
         model.addAttribute("lancamentos", lancamentos);
@@ -196,5 +134,67 @@ public class EventoFinanceiroController {
         model.addAttribute("saldo", saldo);
 
         return "evento-detalhe";
+    }
+
+    private void gerarLancamentosRecorrentes(EventoFinanceiro evento) {
+
+        Integer diaRecorrencia = definirDiaRecorrencia(evento);
+
+        if (diaRecorrencia == null) {
+            return;
+        }
+
+        List<Lancamento> recorrentes =
+                lancamentoRepository
+                        .findByRecorrenteTrueAndDiaRecorrencia(diaRecorrencia);
+
+        List<Lancamento> jaLancados =
+                lancamentoRepository.findByEventoId(evento.getId());
+
+        for (Lancamento r : recorrentes) {
+
+            boolean jaExiste =
+                    jaLancados.stream()
+                            .anyMatch(l ->
+                                    l.getDescricao() != null
+                                    && r.getDescricao() != null
+                                    && l.getDescricao().equals(r.getDescricao()));
+
+            if (jaExiste) {
+                continue;
+            }
+
+            Lancamento novo = new Lancamento();
+
+            novo.setDescricao(r.getDescricao());
+            novo.setValor(r.getValor());
+            novo.setTipo(r.getTipo());
+            novo.setStatus(r.getStatus());
+            novo.setCategoria(r.getCategoria());
+            novo.setCartao(r.getCartao());
+            novo.setCompromisso(r.getCompromisso());
+
+            novo.setEvento(evento);
+            novo.setDataVencimento(evento.getDataEvento());
+
+            novo.setRecorrente(false);
+            novo.setParcelado(false);
+            novo.setDiaRecorrencia(r.getDiaRecorrencia());
+
+            lancamentoRepository.save(novo);
+        }
+    }
+
+    private Integer definirDiaRecorrencia(EventoFinanceiro evento) {
+
+        if (evento.getIndice() == null) {
+            return null;
+        }
+
+        if (evento.getIndice() % 2 == 0) {
+            return 30;
+        }
+
+        return 15;
     }
 }
