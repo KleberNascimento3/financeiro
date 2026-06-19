@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<meta charset="UTF-8">
+<body>
+
+<nav th:fragment="header" class="navbar navbar-expand-lg navbar-dark bg-dark">
+    <div class="container-fluid">
+
+        <a class="navbar-brand" th:href="@{/dashboard}">
+            Financeiro
+        </a>
+
+        <button class="navbar-toggler" type="button"
+                data-bs-toggle="collapse"
+                data-bs-target="#navbarNav">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+
+        <div class="collapse navbar-collapse" id="navbarNav">
+            <ul class="navbar-nav">
+
+                <li class="nav-item">
+                    <a class="nav-link" th:href="@{/dashboard}">
+                        Dashboard
+                    </a>
+                </li>
+
+                <li class="nav-item">
+                    <a class="nav-link" th:href="@{/lancamentos}">
+                        Lançamentos
+                    </a>
+                </li>					
+
+					<li class="nav-item">
+                    <a class="nav-link" th:href="@{/lancamentos/novo}">
+                        Novo Lançamento
+                    </a>
+                </li>
+
+                <li class="nav-item">
+                    <a class="nav-link" th:href="@{/eventos}">
+                        Eventos
+                    </a>
+                </li>
+
+                <li class="nav-item">
+                    <a class="nav-link" th:href="@{/categorias}">
+                        Categorias
+                    </a>
+                </li>
+                
+                <li class="nav-item"><a class="nav-link" href="/cartoes">
+							Cartões </a></li>
+                
+
+            </ul>
+        </div>
+
+    </div>
+</nav>
+</body>
+</html>

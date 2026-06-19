@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<meta charset="UTF-8">
+<body>
+
+<nav class="navbar navbar-expand-lg navbar-dark bg-dark"
+     th:fragment="menu">
+
+    <div class="container-fluid">
+
+        <a class="navbar-brand" href="/">Financeiro</a>
+
+        <div class="navbar-nav">
+
+            <a class="nav-link" th:href="@{/}">
+                Dashboard
+            </a>
+
+            <a class="nav-link" th:href="@{/lancamentos}">
+                Lan�amentos
+            </a>
+
+            <a class="nav-link" th:href="@{/lancamentos/novo}">
+                Novo Lan�amento
+            </a>
+
+            <a class="nav-link" th:href="@{/eventos}">
+                Eventos
+            </a>
+
+            <a class="nav-link" th:href="@{/categorias}">
+                Categorias
+            </a>
+
+				<li class="nav-item"><a class="nav-link" href="/compromissos">
+						Compromissos </a></li>
+
+			</div>
+
+    </div>
+
+</nav>
+
+</body>
+</html>
