@@ -16,12 +16,13 @@ import org.springframework.web.bind.annotation.RequestParam;
 import com.kleber.financeiro.entity.Categoria;
 import com.kleber.financeiro.entity.EventoFinanceiro;
 import com.kleber.financeiro.entity.Lancamento;
+import com.kleber.financeiro.enums.TipoLancamento;
 import com.kleber.financeiro.repository.CartaoRepository;
 import com.kleber.financeiro.repository.CategoriaRepository;
 import com.kleber.financeiro.repository.EventoFinanceiroRepository;
 import com.kleber.financeiro.repository.LancamentoRepository;
+import com.kleber.financeiro.service.EventoAutomaticoService;
 
-import com.kleber.financeiro.enums.TipoLancamento;
 
 import jakarta.validation.Valid;
 
@@ -32,17 +33,21 @@ public class LancamentoController {
     private final EventoFinanceiroRepository eventoRepository;
     private final CategoriaRepository categoriaRepository;
     private final CartaoRepository cartaoRepository;
+	private EventoAutomaticoService eventoAutomaticoService;
+    
 
     public LancamentoController(
             LancamentoRepository repository,
             EventoFinanceiroRepository eventoRepository,
             CategoriaRepository categoriaRepository,
-            CartaoRepository cartaoRepository) {
+            CartaoRepository cartaoRepository,
+            EventoAutomaticoService eventoAutomaticoService) {
 
         this.repository = repository;
         this.eventoRepository = eventoRepository;
         this.categoriaRepository = categoriaRepository;
         this.cartaoRepository = cartaoRepository;
+        this.eventoAutomaticoService = eventoAutomaticoService;
     }
 
     @GetMapping("/lancamentos")
@@ -207,34 +212,14 @@ public class LancamentoController {
                 parcela.setTotalParcelas(lancamento.getTotalParcelas());
                 parcela.setDiaRecorrencia(lancamento.getDiaRecorrencia());
 
-                EventoFinanceiro eventoParcela = null;
+                LocalDate dataParcela =
+                        lancamento.getDataVencimento().plusMonths(i - 1);
 
-                int indiceDesejado =
-                        lancamento.getEvento().getIndice()
-                                + ((i - 1) * 2);
-
-                for (EventoFinanceiro e : eventosParcelas) {
-                    if (e.getIndice() != null
-                            && e.getIndice().equals(indiceDesejado)) {
-                        eventoParcela = e;
-                        break;
-                    }
-                }
+                EventoFinanceiro eventoParcela =
+                        eventoAutomaticoService.obterOuCriarEvento(dataParcela);
 
                 parcela.setEvento(eventoParcela);
-
-                if (eventoParcela != null
-                        && eventoParcela.getDataEvento() != null) {
-
-                    parcela.setDataVencimento(
-                            eventoParcela.getDataEvento());
-
-                } else {
-
-                    parcela.setDataVencimento(
-                            lancamento.getDataVencimento()
-                                    .plusMonths(i - 1));
-                }
+                parcela.setDataVencimento(dataParcela);
 
                 repository.save(parcela);
             }

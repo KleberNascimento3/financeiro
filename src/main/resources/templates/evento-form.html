@@ -85,12 +85,15 @@
                     Salvar
                 </button>
 
-                <a th:href="@{/eventos}"
-                   class="btn btn-secondary">
-                    Voltar
-                </a>
+					<div>
+						<a th:href="@{/eventos/gerar-recorrentes/{id}(id=${evento.id})}"
+							class="btn btn-primary"
+							onclick="return confirm('Gerar lançamentos recorrentes neste evento?')">
+							Gerar Recorrentes </a> <a th:href="@{/eventos}"
+							class="btn btn-secondary"> Voltar </a>
+					</div>
 
-            </form>
+				</form>
 
         </div>
 
