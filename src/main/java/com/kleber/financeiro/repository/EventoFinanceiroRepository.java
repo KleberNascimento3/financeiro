@@ -6,6 +6,7 @@ import java.util.Optional;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import com.kleber.financeiro.entity.EventoFinanceiro;
+import com.kleber.financeiro.enums.TipoEventoFinanceiro;
 
 public interface EventoFinanceiroRepository
         extends JpaRepository<EventoFinanceiro, Long> {
@@ -18,5 +19,8 @@ public interface EventoFinanceiroRepository
             LocalDate dataEvento);
 
     EventoFinanceiro findTopByOrderByIndiceDesc();
+
+    List<EventoFinanceiro> findByTipoOrderByDataEventoAsc(
+            TipoEventoFinanceiro tipo);
 
 }

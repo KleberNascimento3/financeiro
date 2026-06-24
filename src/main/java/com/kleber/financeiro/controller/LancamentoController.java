@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import com.kleber.financeiro.entity.Categoria;
 import com.kleber.financeiro.entity.EventoFinanceiro;
 import com.kleber.financeiro.entity.Lancamento;
+import com.kleber.financeiro.enums.TipoEventoFinanceiro;
 import com.kleber.financeiro.enums.TipoLancamento;
 import com.kleber.financeiro.repository.CartaoRepository;
 import com.kleber.financeiro.repository.CategoriaRepository;
@@ -170,13 +171,11 @@ public class LancamentoController {
             if (lancamento.getEvento() == null
                     || lancamento.getEvento().getIndice() == null) {
 
-                result.rejectValue(
-                        "evento",
-                        "evento.obrigatorio",
-                        "Selecione um evento para lançar as parcelas");
+                EventoFinanceiro eventoInicial =
+                        eventoAutomaticoService.obterOuCriarEvento(
+                                lancamento.getDataVencimento());
 
-                carregarCombos(model);
-                return "lancamento-form";
+                lancamento.setEvento(eventoInicial);
             }
 
             BigDecimal valorParcela =
@@ -225,7 +224,9 @@ public class LancamentoController {
             }
 
         } else {
+            associarEventoAutomaticoReceita(lancamento);
             repository.save(lancamento);
+            gerarReceitaRecorrenteEmEventosPagamento(lancamento);
         }
 
         return "redirect:/lancamentos";
@@ -357,6 +358,72 @@ public class LancamentoController {
             lancamento.setCompromisso(null);
         }
     }
+
+    private void gerarReceitaRecorrenteEmEventosPagamento(Lancamento receita) {
+
+        if (receita.getTipo() != TipoLancamento.RECEITA
+                || !Boolean.TRUE.equals(receita.getRecorrente())) {
+            return;
+        }
+
+        List<EventoFinanceiro> eventosPagamento =
+                eventoRepository.findByTipoOrderByDataEventoAsc(
+                        TipoEventoFinanceiro.PAGAMENTO);
+
+        for (EventoFinanceiro evento : eventosPagamento) {
+
+            List<Lancamento> lancamentosEvento =
+                    repository.findByEventoId(evento.getId());
+
+            boolean jaExiste =
+                    lancamentosEvento.stream()
+                            .anyMatch(l ->
+                                    l.getTipo() == TipoLancamento.RECEITA
+                                    && l.getDescricao() != null
+                                    && receita.getDescricao() != null
+                                    && l.getDescricao().equals(receita.getDescricao()));
+
+            if (jaExiste) {
+                continue;
+            }
+
+            Lancamento novo = new Lancamento();
+
+            novo.setDescricao(receita.getDescricao());
+            novo.setValor(receita.getValor());
+            novo.setTipo(receita.getTipo());
+            novo.setStatus(receita.getStatus());
+            novo.setCategoria(receita.getCategoria());
+            novo.setCartao(receita.getCartao());
+            novo.setCompromisso(receita.getCompromisso());
+
+            novo.setEvento(evento);
+            novo.setDataVencimento(evento.getDataEvento());
+
+            novo.setRecorrente(false);
+            novo.setParcelado(false);
+            novo.setDiaRecorrencia(receita.getDiaRecorrencia());
+
+            repository.save(novo);
+        }
+    }
+
+    private void associarEventoAutomaticoReceita(Lancamento lancamento) {
+
+        if (lancamento.getTipo() != TipoLancamento.RECEITA
+                || Boolean.TRUE.equals(lancamento.getRecorrente())
+                || lancamento.getDataVencimento() == null
+                || lancamento.getEvento() != null) {
+            return;
+        }
+
+        EventoFinanceiro evento =
+                eventoAutomaticoService.obterOuCriarEvento(
+                        lancamento.getDataVencimento());
+
+        lancamento.setEvento(evento);
+    }
     
    
 }
+

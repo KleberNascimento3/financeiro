@@ -6,12 +6,16 @@ import java.util.List;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import com.kleber.financeiro.entity.Lancamento;
+import com.kleber.financeiro.enums.TipoLancamento;
 
 public interface LancamentoRepository extends JpaRepository<Lancamento, Long> {
 
     List<Lancamento> findByEventoId(Long eventoId);
 
     List<Lancamento> findByRecorrenteTrue();
+
+    List<Lancamento> findByRecorrenteTrueAndTipo(
+            TipoLancamento tipo);
 
     List<Lancamento> findByRecorrenteTrueAndDiaRecorrencia(
             Integer diaRecorrencia);

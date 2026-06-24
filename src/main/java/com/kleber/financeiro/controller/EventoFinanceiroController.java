@@ -1,6 +1,7 @@
 package com.kleber.financeiro.controller;
 
 import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.List;
 
 import org.springframework.stereotype.Controller;
@@ -12,6 +13,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 
 import com.kleber.financeiro.entity.EventoFinanceiro;
 import com.kleber.financeiro.entity.Lancamento;
+import com.kleber.financeiro.enums.TipoEventoFinanceiro;
 import com.kleber.financeiro.enums.TipoLancamento;
 import com.kleber.financeiro.repository.EventoFinanceiroRepository;
 import com.kleber.financeiro.repository.LancamentoRepository;
@@ -145,8 +147,25 @@ public class EventoFinanceiroController {
         }
 
         List<Lancamento> recorrentes =
-                lancamentoRepository
-                        .findByRecorrenteTrueAndDiaRecorrencia(diaRecorrencia);
+                new ArrayList<>(lancamentoRepository
+                        .findByRecorrenteTrueAndDiaRecorrencia(diaRecorrencia));
+
+        if (evento.getTipo() == TipoEventoFinanceiro.PAGAMENTO) {
+            List<Lancamento> receitasRecorrentes =
+                    lancamentoRepository.findByRecorrenteTrueAndTipo(
+                            TipoLancamento.RECEITA);
+
+            for (Lancamento receita : receitasRecorrentes) {
+                boolean jaEstaNaLista =
+                        recorrentes.stream()
+                                .anyMatch(r -> r.getId() != null
+                                        && r.getId().equals(receita.getId()));
+
+                if (!jaEstaNaLista) {
+                    recorrentes.add(receita);
+                }
+            }
+        }
 
         List<Lancamento> jaLancados =
                 lancamentoRepository.findByEventoId(evento.getId());

@@ -3,6 +3,7 @@ package com.kleber.financeiro.service;
 import java.time.LocalDate;
 import java.time.Month;
 import java.time.format.TextStyle;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 
@@ -11,6 +12,7 @@ import org.springframework.stereotype.Service;
 import com.kleber.financeiro.entity.EventoFinanceiro;
 import com.kleber.financeiro.entity.Lancamento;
 import com.kleber.financeiro.enums.TipoEventoFinanceiro;
+import com.kleber.financeiro.enums.TipoLancamento;
 import com.kleber.financeiro.repository.EventoFinanceiroRepository;
 import com.kleber.financeiro.repository.LancamentoRepository;
 
@@ -117,9 +119,26 @@ public class EventoAutomaticoService {
                         : 30;
 
         List<Lancamento> recorrentes =
-                lancamentoRepository
+                new ArrayList<>(lancamentoRepository
                         .findByRecorrenteTrueAndDiaRecorrencia(
-                                diaRecorrencia);
+                                diaRecorrencia));
+
+        if (evento.getTipo() == TipoEventoFinanceiro.PAGAMENTO) {
+            List<Lancamento> receitasRecorrentes =
+                    lancamentoRepository.findByRecorrenteTrueAndTipo(
+                            TipoLancamento.RECEITA);
+
+            for (Lancamento receita : receitasRecorrentes) {
+                boolean jaEstaNaLista =
+                        recorrentes.stream()
+                                .anyMatch(r -> r.getId() != null
+                                        && r.getId().equals(receita.getId()));
+
+                if (!jaEstaNaLista) {
+                    recorrentes.add(receita);
+                }
+            }
+        }
 
         for (Lancamento r : recorrentes) {
 
