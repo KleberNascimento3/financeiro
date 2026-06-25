@@ -42,7 +42,7 @@
                    th:value="${fimSelecionado}">
         </div>
 
-        <div class="col-md-4">
+        <div class="col-md-3">
             <label class="form-label">Evento</label>
             <select name="eventoId"
                     class="form-select">
@@ -53,6 +53,22 @@
                         th:value="${evento.id}"
                         th:selected="${eventoSelecionado != null and eventoSelecionado == evento.id}"
                         th:text="${evento.indice + ' - ' + evento.tipo + ' - ' + evento.descricao}">
+                </option>
+
+            </select>
+        </div>
+
+        <div class="col-md-3">
+            <label class="form-label">Cartão</label>
+            <select name="cartaoId"
+                    class="form-select">
+
+                <option value="">Todos os cartões</option>
+
+                <option th:each="cartao : ${cartoes}"
+                        th:value="${cartao.id}"
+                        th:selected="${cartaoSelecionado != null and cartaoSelecionado == cartao.id}"
+                        th:text="${cartao.nome}">
                 </option>
 
             </select>
@@ -79,6 +95,7 @@
                 <th>ID</th>
                 <th>Descrição</th>
                 <th>Categoria</th>
+                <th>Cartão</th>
                 <th>Vencimento</th>
                 <th>Valor</th>
                 <th>Tipo</th>
@@ -96,6 +113,8 @@
                 <td th:text="${item.descricao}"></td>
 
                 <td th:text="${item.categoria != null ? item.categoria.nome : ''}"></td>
+
+                <td th:text="${item.cartao != null ? item.cartao.nome : ''}"></td>
 
                 <td th:text="${item.dataVencimento != null ? #temporals.format(item.dataVencimento, 'dd/MM/yyyy') : ''}"></td>
 

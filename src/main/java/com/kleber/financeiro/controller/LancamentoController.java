@@ -54,6 +54,7 @@ public class LancamentoController {
     @GetMapping("/lancamentos")
     public String listar(
             @RequestParam(required = false) Long eventoId,
+            @RequestParam(required = false) Long cartaoId,
             @RequestParam(required = false) LocalDate inicio,
             @RequestParam(required = false) LocalDate fim,
             Model model) {
@@ -88,7 +89,13 @@ public class LancamentoController {
     	    lista = repository
     	            .findAllByOrderByDataVencimentoAsc();
     	}
-    	
+        if (cartaoId != null) {
+            lista = lista.stream()
+                    .filter(l -> l.getCartao() != null
+                            && cartaoId.equals(l.getCartao().getId()))
+                    .toList();
+        }
+    
     	BigDecimal receitas = BigDecimal.ZERO;
     	BigDecimal despesas = BigDecimal.ZERO;
 
@@ -113,6 +120,7 @@ public class LancamentoController {
     	model.addAttribute("saldoFiltro", saldo);
 
         model.addAttribute("eventoSelecionado", eventoId);
+        model.addAttribute("cartaoSelecionado", cartaoId);
         model.addAttribute("inicioSelecionado", inicio);
         model.addAttribute("fimSelecionado", fim);
 
