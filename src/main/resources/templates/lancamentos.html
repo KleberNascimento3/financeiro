@@ -74,6 +74,15 @@
             </select>
         </div>
 
+        <div class="col-md-4">
+            <label class="form-label">Descrição</label>
+            <input type="text"
+                   name="descricao"
+                   class="form-control"
+                   placeholder="Parte da descrição"
+                   th:value="${descricaoSelecionada}">
+        </div>
+
         <div class="col-md-2 d-flex align-items-end">
             <button class="btn btn-primary w-100"
                     type="submit">
@@ -83,15 +92,42 @@
 
     </form>
 
-    <a th:href="@{/lancamentos}"
-       class="btn btn-secondary mb-3">
-        Limpar Filtro
-    </a>
+    <div class="d-flex gap-2 mb-3 align-items-center flex-wrap">
+        <a th:href="@{/lancamentos}"
+           class="btn btn-secondary">
+            Limpar Filtro
+        </a>
+
+        <button type="submit"
+                form="bulk-delete-form"
+                class="btn btn-danger"
+                onclick="return confirm('Deseja excluir os lançamentos selecionados?')">
+            Excluir selecionados
+        </button>
+
+        <div class="border rounded px-3 py-2 bg-light">
+            <span class="text-muted">Selecionados:</span>
+            <strong id="selected-count">0</strong>
+            <span class="text-muted ms-3">Total:</span>
+            <strong id="selected-total-value">R$ 0,00</strong>
+        </div>
+    </div>
+
+    <form id="bulk-delete-form"
+          th:action="@{/lancamentos/excluir-selecionados}"
+          method="post">
+        <input type="hidden" name="filtroEventoId" th:value="${eventoSelecionado}">
+        <input type="hidden" name="filtroCartaoId" th:value="${cartaoSelecionado}">
+        <input type="hidden" name="filtroDescricao" th:value="${descricaoSelecionada}">
+        <input type="hidden" name="filtroInicio" th:value="${inicioSelecionado}">
+        <input type="hidden" name="filtroFim" th:value="${fimSelecionado}">
+    </form>
 
     <table class="table table-striped table-hover">
 
         <thead>
             <tr>
+                <th>Sel.</th>
                 <th>ID</th>
                 <th>Descrição</th>
                 <th>Categoria</th>
@@ -107,6 +143,14 @@
         <tbody>
 
             <tr th:each="item : ${lista}">
+
+                <td>
+                    <input type="checkbox"
+                           name="ids"
+                           th:value="${item.id}"
+                           th:attr="data-valor=${item.valor}"
+                           form="bulk-delete-form">
+                </td>
 
                 <td th:text="${item.id}"></td>
 
@@ -126,12 +170,22 @@
 
                 <td>
 
-                    <a th:href="@{/lancamentos/editar/{id}(id=${item.id})}"
+                    <a th:href="@{/lancamentos/editar/{id}(id=${item.id},
+                            filtroEventoId=${eventoSelecionado},
+                            filtroCartaoId=${cartaoSelecionado},
+                            filtroDescricao=${descricaoSelecionada},
+                            filtroInicio=${inicioSelecionado},
+                            filtroFim=${fimSelecionado})}"
                        class="btn btn-warning btn-sm">
                         Editar
                     </a>
 
-                    <a th:href="@{/lancamentos/duplicar/{id}(id=${item.id})}"
+                    <a th:href="@{/lancamentos/duplicar/{id}(id=${item.id},
+                            filtroEventoId=${eventoSelecionado},
+                            filtroCartaoId=${cartaoSelecionado},
+                            filtroDescricao=${descricaoSelecionada},
+                            filtroInicio=${inicioSelecionado},
+                            filtroFim=${fimSelecionado})}"
                        class="btn btn-info btn-sm"
                        onclick="return confirm('Deseja duplicar este lançamento?')">
                         Duplicar
@@ -140,6 +194,12 @@
                     <form th:action="@{/lancamentos/excluir/{id}(id=${item.id})}"
                           method="post"
                           style="display:inline">
+
+                        <input type="hidden" name="filtroEventoId" th:value="${eventoSelecionado}">
+                        <input type="hidden" name="filtroCartaoId" th:value="${cartaoSelecionado}">
+                        <input type="hidden" name="filtroDescricao" th:value="${descricaoSelecionada}">
+                        <input type="hidden" name="filtroInicio" th:value="${inicioSelecionado}">
+                        <input type="hidden" name="filtroFim" th:value="${fimSelecionado}">
 
                         <button type="submit"
                                 class="btn btn-danger btn-sm"
@@ -197,6 +257,43 @@
 </div>
 
 <div th:replace="~{fragments/footer :: footer}"></div>
+
+<script>
+function updateSelectedTotal() {
+    const selected = document.querySelectorAll('input[name="ids"]:checked');
+    let total = 0;
+
+    selected.forEach(input => {
+        const value = Number.parseFloat(input.dataset.valor || '0');
+
+        if (!Number.isNaN(value)) {
+            total += value;
+        }
+    });
+
+    const countElement = document.getElementById('selected-count');
+    const totalElement = document.getElementById('selected-total-value');
+
+    if (!countElement || !totalElement) {
+        return;
+    }
+
+    countElement.textContent = selected.length;
+    totalElement.textContent =
+            total.toLocaleString('pt-BR', {
+                style: 'currency',
+                currency: 'BRL'
+            });
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+    document.querySelectorAll('input[name="ids"]').forEach(input => {
+        input.addEventListener('change', updateSelectedTotal);
+    });
+
+    updateSelectedTotal();
+});
+</script>
 
 </body>
 </html>

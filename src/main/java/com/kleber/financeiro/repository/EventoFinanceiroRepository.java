@@ -23,4 +23,8 @@ public interface EventoFinanceiroRepository
     List<EventoFinanceiro> findByTipoOrderByDataEventoAsc(
             TipoEventoFinanceiro tipo);
 
+    List<EventoFinanceiro> findByTipoAndIndiceGreaterThanEqualOrderByIndiceAsc(
+            TipoEventoFinanceiro tipo,
+            Integer indice);
+
 }

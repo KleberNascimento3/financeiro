@@ -45,6 +45,11 @@ body{
                   method="post">
 
                 <input type="hidden" th:field="*{id}">
+                <input type="hidden" name="filtroEventoId" th:value="${filtroEventoId}">
+                <input type="hidden" name="filtroCartaoId" th:value="${filtroCartaoId}">
+                <input type="hidden" name="filtroDescricao" th:value="${filtroDescricao}">
+                <input type="hidden" name="filtroInicio" th:value="${filtroInicio}">
+                <input type="hidden" name="filtroFim" th:value="${filtroFim}">
 
                 <div class="row">
 
@@ -264,7 +269,7 @@ body{
                         Salvar
                     </button>
 
-                    <a th:href="@{/lancamentos}"
+                    <a th:href="@{/lancamentos(eventoId=${filtroEventoId}, cartaoId=${filtroCartaoId}, descricao=${filtroDescricao}, inicio=${filtroInicio}, fim=${filtroFim})}"
                        class="btn btn-secondary">
                         Voltar
                     </a>

@@ -12,10 +12,12 @@ import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.util.UriComponentsBuilder;
 
 import com.kleber.financeiro.entity.Categoria;
 import com.kleber.financeiro.entity.EventoFinanceiro;
 import com.kleber.financeiro.entity.Lancamento;
+import com.kleber.financeiro.enums.StatusLancamento;
 import com.kleber.financeiro.enums.TipoEventoFinanceiro;
 import com.kleber.financeiro.enums.TipoLancamento;
 import com.kleber.financeiro.repository.CartaoRepository;
@@ -55,6 +57,7 @@ public class LancamentoController {
     public String listar(
             @RequestParam(required = false) Long eventoId,
             @RequestParam(required = false) Long cartaoId,
+            @RequestParam(required = false) String descricao,
             @RequestParam(required = false) LocalDate inicio,
             @RequestParam(required = false) LocalDate fim,
             Model model) {
@@ -95,6 +98,17 @@ public class LancamentoController {
                             && cartaoId.equals(l.getCartao().getId()))
                     .toList();
         }
+
+        String descricaoFiltro =
+                descricao != null ? descricao.trim().toLowerCase() : "";
+
+        if (!descricaoFiltro.isEmpty()) {
+            lista = lista.stream()
+                    .filter(l -> l.getDescricao() != null
+                            && l.getDescricao().toLowerCase()
+                                    .contains(descricaoFiltro))
+                    .toList();
+        }
     
     	BigDecimal receitas = BigDecimal.ZERO;
     	BigDecimal despesas = BigDecimal.ZERO;
@@ -121,6 +135,7 @@ public class LancamentoController {
 
         model.addAttribute("eventoSelecionado", eventoId);
         model.addAttribute("cartaoSelecionado", cartaoId);
+        model.addAttribute("descricaoSelecionada", descricao);
         model.addAttribute("inicioSelecionado", inicio);
         model.addAttribute("fimSelecionado", fim);
 
@@ -136,10 +151,14 @@ public class LancamentoController {
 
         lancamento.setCategoria(new Categoria());
         lancamento.setEvento(new EventoFinanceiro());
+        lancamento.setTipo(TipoLancamento.DESPESA);
+        lancamento.setStatus(StatusLancamento.PENDENTE);
+        lancamento.setParcelado(false);
+        lancamento.setRecorrente(false);
+        lancamento.setTotalParcelas(1);
 
         model.addAttribute("lancamento", lancamento);
         carregarCombos(model);
-
         return "lancamento-form";
     }
 
@@ -147,12 +166,21 @@ public class LancamentoController {
     public String salvar(
             @Valid @ModelAttribute Lancamento lancamento,
             BindingResult result,
+            @RequestParam(required = false) Long filtroEventoId,
+            @RequestParam(required = false) Long filtroCartaoId,
+            @RequestParam(required = false) String filtroDescricao,
+            @RequestParam(required = false) LocalDate filtroInicio,
+            @RequestParam(required = false) LocalDate filtroFim,
             Model model) {
 
         if (result.hasErrors()) {
             carregarCombos(model);
+            carregarFiltros(model, filtroEventoId, filtroCartaoId,
+                    filtroDescricao, filtroInicio, filtroFim);
             return "lancamento-form";
         }
+
+        boolean novoLancamento = lancamento.getId() == null;
 
         if (lancamento.getEvento() != null
                 && lancamento.getEvento().getId() != null) {
@@ -172,7 +200,15 @@ public class LancamentoController {
 
         tratarRelacionamentos(lancamento);
 
-        if (Boolean.TRUE.equals(lancamento.getParcelado())
+        if (!novoLancamento) {
+            lancamento.setParcelado(false);
+            lancamento.setRecorrente(false);
+            lancamento.setTotalParcelas(1);
+            lancamento.setNumeroParcela(null);
+        }
+
+        if (novoLancamento
+                && Boolean.TRUE.equals(lancamento.getParcelado())
                 && lancamento.getTotalParcelas() != null
                 && lancamento.getTotalParcelas() > 1) {
 
@@ -193,8 +229,20 @@ public class LancamentoController {
                             java.math.RoundingMode.HALF_UP);
 
             List<EventoFinanceiro> eventosParcelas =
-                    eventoRepository.findByIndiceGreaterThanEqualOrderByIndiceAsc(
-                            lancamento.getEvento().getIndice());
+                    eventoRepository
+                            .findByTipoAndIndiceGreaterThanEqualOrderByIndiceAsc(
+                                    lancamento.getEvento().getTipo(),
+                                    lancamento.getEvento().getIndice());
+
+            if (eventosParcelas.size() < lancamento.getTotalParcelas()) {
+                result.rejectValue(
+                        "totalParcelas",
+                        "parcelas.eventos.insuficientes",
+                        "Não existem eventos suficientes para lançar todas as parcelas");
+
+                carregarCombos(model);
+                return "lancamento-form";
+            }
 
             for (int i = 1; i <= lancamento.getTotalParcelas(); i++) {
 
@@ -219,11 +267,11 @@ public class LancamentoController {
                 parcela.setTotalParcelas(lancamento.getTotalParcelas());
                 parcela.setDiaRecorrencia(lancamento.getDiaRecorrencia());
 
-                LocalDate dataParcela =
-                        lancamento.getDataVencimento().plusMonths(i - 1);
-
                 EventoFinanceiro eventoParcela =
-                        eventoAutomaticoService.obterOuCriarEvento(dataParcela);
+                        eventosParcelas.get(i - 1);
+
+                LocalDate dataParcela =
+                        eventoParcela.getDataEvento();
 
                 parcela.setEvento(eventoParcela);
                 parcela.setDataVencimento(dataParcela);
@@ -234,15 +282,28 @@ public class LancamentoController {
         } else {
             associarEventoAutomaticoReceita(lancamento);
             repository.save(lancamento);
-            gerarReceitaRecorrenteEmEventosPagamento(lancamento);
+
+            if (novoLancamento) {
+                gerarReceitaRecorrenteEmEventosPagamento(lancamento);
+            }
         }
 
-        return "redirect:/lancamentos";
+        return redirectLancamentos(
+                filtroEventoId,
+                filtroCartaoId,
+                filtroDescricao,
+                filtroInicio,
+                filtroFim);
     }
 
     @GetMapping("/lancamentos/editar/{id}")
     public String editar(
             @PathVariable Long id,
+            @RequestParam(required = false) Long filtroEventoId,
+            @RequestParam(required = false) Long filtroCartaoId,
+            @RequestParam(required = false) String filtroDescricao,
+            @RequestParam(required = false) LocalDate filtroInicio,
+            @RequestParam(required = false) LocalDate filtroFim,
             Model model) {
 
         Lancamento lancamento =
@@ -264,6 +325,10 @@ public class LancamentoController {
             lancamento.setEvento(new EventoFinanceiro());
         }
 
+        lancamento.setParcelado(false);
+        lancamento.setRecorrente(false);
+        lancamento.setTotalParcelas(1);
+
         model.addAttribute("lancamento", lancamento);
         carregarCombos(model);
 
@@ -271,9 +336,43 @@ public class LancamentoController {
     }
 
     @PostMapping("/lancamentos/excluir/{id}")
-    public String excluir(@PathVariable Long id) {
+    public String excluir(
+            @PathVariable Long id,
+            @RequestParam(required = false) Long filtroEventoId,
+            @RequestParam(required = false) Long filtroCartaoId,
+            @RequestParam(required = false) String filtroDescricao,
+            @RequestParam(required = false) LocalDate filtroInicio,
+            @RequestParam(required = false) LocalDate filtroFim) {
+
         repository.deleteById(id);
-        return "redirect:/lancamentos";
+
+        return redirectLancamentos(
+                filtroEventoId,
+                filtroCartaoId,
+                filtroDescricao,
+                filtroInicio,
+                filtroFim);
+    }
+
+    @PostMapping("/lancamentos/excluir-selecionados")
+    public String excluirSelecionados(
+            @RequestParam(required = false) List<Long> ids,
+            @RequestParam(required = false) Long filtroEventoId,
+            @RequestParam(required = false) Long filtroCartaoId,
+            @RequestParam(required = false) String filtroDescricao,
+            @RequestParam(required = false) LocalDate filtroInicio,
+            @RequestParam(required = false) LocalDate filtroFim) {
+
+        if (ids != null && !ids.isEmpty()) {
+            repository.deleteAllById(ids);
+        }
+
+        return redirectLancamentos(
+                filtroEventoId,
+                filtroCartaoId,
+                filtroDescricao,
+                filtroInicio,
+                filtroFim);
     }
 
     private void carregarCombos(Model model) {
@@ -281,9 +380,30 @@ public class LancamentoController {
         model.addAttribute("eventos", eventoRepository.findAll());
         model.addAttribute("cartoes", cartaoRepository.findAll());
     }
+
+    private void carregarFiltros(
+            Model model,
+            Long filtroEventoId,
+            Long filtroCartaoId,
+            String filtroDescricao,
+            LocalDate filtroInicio,
+            LocalDate filtroFim) {
+
+        model.addAttribute("filtroEventoId", filtroEventoId);
+        model.addAttribute("filtroCartaoId", filtroCartaoId);
+        model.addAttribute("filtroDescricao", filtroDescricao);
+        model.addAttribute("filtroInicio", filtroInicio);
+        model.addAttribute("filtroFim", filtroFim);
+    }
     
     @GetMapping("/lancamentos/duplicar/{id}")
-    public String duplicar(@PathVariable Long id) {
+    public String duplicar(
+            @PathVariable Long id,
+            @RequestParam(required = false) Long filtroEventoId,
+            @RequestParam(required = false) Long filtroCartaoId,
+            @RequestParam(required = false) String filtroDescricao,
+            @RequestParam(required = false) LocalDate filtroInicio,
+            @RequestParam(required = false) LocalDate filtroFim) {
 
         Lancamento original =
                 repository.findById(id).orElseThrow();
@@ -311,7 +431,12 @@ public class LancamentoController {
 
         repository.save(copia);
 
-        return "redirect:/lancamentos";
+        return redirectLancamentos(
+                filtroEventoId,
+                filtroCartaoId,
+                filtroDescricao,
+                filtroInicio,
+                filtroFim);
     }
 
     private void tratarRelacionamentos(Lancamento lancamento) {
@@ -414,6 +539,39 @@ public class LancamentoController {
 
             repository.save(novo);
         }
+    }
+
+    private String redirectLancamentos(
+            Long filtroEventoId,
+            Long filtroCartaoId,
+            String filtroDescricao,
+            LocalDate filtroInicio,
+            LocalDate filtroFim) {
+
+        UriComponentsBuilder builder =
+                UriComponentsBuilder.fromPath("/lancamentos");
+
+        if (filtroEventoId != null) {
+            builder.queryParam("eventoId", filtroEventoId);
+        }
+
+        if (filtroCartaoId != null) {
+            builder.queryParam("cartaoId", filtroCartaoId);
+        }
+
+        if (filtroDescricao != null && !filtroDescricao.isBlank()) {
+            builder.queryParam("descricao", filtroDescricao);
+        }
+
+        if (filtroInicio != null) {
+            builder.queryParam("inicio", filtroInicio);
+        }
+
+        if (filtroFim != null) {
+            builder.queryParam("fim", filtroFim);
+        }
+
+        return "redirect:" + builder.toUriString();
     }
 
     private void associarEventoAutomaticoReceita(Lancamento lancamento) {
